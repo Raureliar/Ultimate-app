@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ULTIMATE PRO - EPS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f172a;
+            font-family: 'Archivo Black', sans-serif;
+            height: 100vh;
+            color: white;
+            overflow: hidden;
+            margin: 0;
+        }
+        
+        .varsity-border { border: 3px solid white; }
+        .varsity-shadow { box-shadow: 6px 6px 0px #000; }
+        .view { display: none; height: 100vh; width: 100vw; flex-direction: column; padding: 20px; }
+        .view.active { display: flex; }
+
+        .pitch {
+            flex-grow: 1;
+            background-color: #059669;
+            position: relative;
+            overflow: hidden;
+            border: 3px solid white;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: row;
+        }
+        .zone {
+            flex: 1;
+            border-right: 1px dashed rgba(255,255,255,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            writing-mode: vertical-rl;
+            text-align: center;
+        }
+        .endzone {
+            background: repeating-linear-gradient(45deg, rgba(255,255,255,0.05), rgba(255,255,255,0.05) 10px, transparent 10px, transparent 20px);
+            background-color: rgba(0,0,0,0.2);
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        .disc {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 34px;
+            height: 34px;
+            background: white;
+            border-radius: 50%;
+            border: 3px solid #334155;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            transition: left 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .active-pitch { border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250, 204, 21, 0.4); }
+        .stats-card { padding: 10px; text-align: center; border-radius: 10px; transition: all 0.3s; }
+        .team-a-ui { background-color: #dc2626; }
+        .team-b-ui { background-color: #2563eb; }
+        .inactive { opacity: 0.3; transform: scale(0.92); }
+        
+        @keyframes goal-flash {
+            0% { background-color: white; }
+            100% { background-color: #059669; }
+        }
+        .flash { animation: goal-flash 0.5s ease-out; }
+
+        input { font-family: sans-serif; font-weight: bold; }
+        
+        .history-item {
+            background: rgba(255,255,255,0.05);
+            border-left: 4px solid #eab308;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .history-item:active { transform: scale(0.98); background: rgba(255,255,255,0.1); }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .stat-badge {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL DE CONFIRMATION FIN DE MATCH -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="bg-slate-800 p-8 varsity-border varsity-shadow rounded-2xl max-w-xs w-full text-center">
+            <p class="text-xl mb-6 uppercase italic">Finir le match maintenant ?</p>
+            <div class="flex gap-4">
+                <button onclick="closeConfirmModal(true)" class="flex-1 bg-red-500 py-3 rounded varsity-shadow font-bold uppercase italic text-sm">Oui</button>
+                <button onclick="closeConfirmModal(false)" class="flex-1 bg-slate-600 py-3 rounded varsity-shadow font-bold uppercase italic text-sm">Non</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CHOIX DE POSSESSION INITIALE -->
+    <div id="possessionModal" class="modal-overlay">
+        <div class="bg-slate-800 p-8 varsity-border varsity-shadow rounded-2xl max-w-sm w-full text-center">
+            <p class="text-xl mb-2 uppercase italic text-yellow-500">Engageant</p>
+            <p class="text-xs mb-6 text-slate-400 uppercase">Quelle équipe a le disque en premier ?</p>
+            <div class="flex flex-col gap-4">
+                <button id="choiceBtnA" onclick="setInitialPossession('A')" class="bg-red-600 py-4 rounded varsity-shadow font-bold uppercase italic text-lg hover:bg-red-500 transition-colors">TEAM A</button>
+                <button id="choiceBtnB" onclick="setInitialPossession('B')" class="bg-blue-600 py-4 rounded varsity-shadow font-bold uppercase italic text-lg hover:bg-blue-500 transition-colors">TEAM B</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. ACCUEIL -->
+    <div id="view-home" class="view active items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-center">
+        <h1 class="text-7xl md:text-9xl mb-8 tracking-tighter italic varsity-shadow border-b-8 border-yellow-500 inline-block px-4 text-white uppercase">Ultimate</h1>
+        <p class="text-xl mb-12 text-slate-400 font-sans tracking-widest uppercase">Outil de progression EPS</p>
+        <div class="flex flex-col gap-4 w-full max-w-xs">
+            <button onclick="showView('config')" class="varsity-border bg-yellow-500 text-black text-2xl px-12 py-6 varsity-shadow hover:translate-y-1 transition-transform uppercase italic">
+                Jouer
+            </button>
+            <button onclick="openHistory()" class="varsity-border bg-slate-700 text-white text-xl px-12 py-4 varsity-shadow hover:translate-y-1 transition-transform uppercase italic">
+                Historique
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. CONFIGURATION -->
+    <div id="view-config" class="view items-center justify-center bg-slate-900">
+        <div class="w-full max-w-md bg-slate-800 p-8 varsity-border varsity-shadow rounded-2xl">
+            <h2 class="text-2xl mb-8 text-center uppercase italic border-b-2 border-slate-600 pb-4 text-white">Nom des équipes</h2>
+            
+            <div class="space-y-6 text-white">
+                <div>
+                    <label class="block text-xs uppercase text-red-400 mb-2">Équipe A (Progression ←)</label>
+                    <input type="text" id="inputNameA" value="EQUIPE A" class="w-full bg-slate-900 varsity-border p-4 text-white outline-none focus:border-red-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-blue-400 mb-2">Équipe B (Progression →)</label>
+                    <input type="text" id="inputNameB" value="EQUIPE B" class="w-full bg-slate-900 varsity-border p-4 text-white outline-none focus:border-blue-500">
+                </div>
+                
+                <button onclick="startMatch()" class="w-full bg-emerald-500 text-black py-6 mt-4 varsity-shadow uppercase italic font-bold text-xl hover:bg-emerald-400">
+                    Lancer le match
+                </button>
+            </div>
+            <button onclick="showView('home')" class="w-full mt-4 text-slate-400 uppercase text-xs">Retour</button>
+        </div>
+    </div>
+
+    <!-- 3. MATCH -->
+    <div id="view-match" class="view flex-col">
+        <div class="varsity-border bg-slate-800 p-3 flex justify-between items-center varsity-shadow mb-4 rounded-xl">
+            <div class="flex gap-4 items-center">
+                <div class="flex flex-col">
+                    <label class="text-[8px] uppercase text-slate-400">Durée (min)</label>
+                    <input type="number" id="matchDurationInput" value="7" min="1" max="60" 
+                           oninput="handleDurationChange()"
+                           class="bg-slate-900 text-white text-lg font-bold w-16 p-1 rounded border border-slate-600 outline-none text-center focus:border-yellow-500 transition-colors">
+                </div>
+                <button onclick="requestEndMatch()" class="bg-red-600/30 border border-red-500 text-red-400 px-3 py-2 rounded-lg text-sm flex items-center gap-1 hover:bg-red-600/50 transition-colors">
+                    🏁 <span class="hidden sm:inline">Fin</span>
+                </button>
+            </div>
+            
+            <div id="gameTimer" class="text-4xl text-yellow-400 font-mono tracking-tighter">07:00</div>
+
+            <button onclick="toggleGame()" id="playBtn" class="bg-yellow-500 text-black px-6 py-2 rounded-lg font-bold text-sm varsity-shadow uppercase italic">
+                Start
+            </button>
+        </div>
+
+        <div class="flex-grow flex flex-row gap-4 overflow-hidden mb-4">
+            <!-- TEAM A -->
+            <div class="flex-1 flex flex-col gap-2">
+                <div id="cardA" class="stats-card team-a-ui varsity-border varsity-shadow">
+                    <div class="flex justify-between items-center px-2">
+                        <span id="displayNameA" class="text-[10px] uppercase truncate max-w-[100px]">Team A</span>
+                        <span id="posA" class="text-[10px] font-mono bg-black/30 rounded px-2">00:00</span>
+                    </div>
+                    <div id="scoreA" class="text-3xl my-1">0</div>
+                </div>
+                <div id="pitchA" onclick="selectTeam('A')" class="pitch">
+                    <div onclick="scoreZone('A', 3, event)" class="zone endzone">BUT (1000)</div>
+                    <div onclick="scoreZone('A', 2, event)" class="zone">Z3 (100)</div>
+                    <div onclick="scoreZone('A', 1, event)" class="zone">Z2 (10)</div>
+                    <div onclick="scoreZone('A', 0, event)" class="zone">Z1 (1)</div>
+                    <div id="discA" class="disc" style="left: 85%;"></div>
+                </div>
+            </div>
+
+            <!-- TEAM B -->
+            <div class="flex-1 flex flex-col gap-2">
+                <div id="cardB" class="stats-card team-b-ui varsity-border varsity-shadow inactive">
+                    <div class="flex justify-between items-center px-2">
+                        <span id="displayNameB" class="text-[10px] uppercase truncate max-w-[100px]">Team B</span>
+                        <span id="posB" class="text-[10px] font-mono bg-black/30 rounded px-2">00:00</span>
+                    </div>
+                    <div id="scoreB" class="text-3xl my-1">0</div>
+                </div>
+                <div id="pitchB" onclick="selectTeam('B')" class="pitch">
+                    <div onclick="scoreZone('B', 0, event)" class="zone">Z1 (1)</div>
+                    <div onclick="scoreZone('B', 1, event)" class="zone">Z2 (10)</div>
+                    <div onclick="scoreZone('B', 2, event)" class="zone">Z3 (100)</div>
+                    <div onclick="scoreZone('B', 3, event)" class="zone endzone">BUT (1000)</div>
+                    <div id="discB" class="disc" style="left: 15%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="undoAction()" class="bg-slate-600 text-white text-[10px] py-4 rounded-xl varsity-shadow uppercase italic font-bold varsity-border hover:bg-slate-500">
+                ↩ Annuler
+            </button>
+            <button onclick="showView('home')" class="bg-slate-700 text-white text-[10px] py-4 rounded-xl varsity-shadow uppercase italic opacity-80 varsity-border">
+                🏠 Menu
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. RÉSULTATS -->
+    <div id="view-result" class="view items-center justify-center bg-slate-950 overflow-y-auto">
+        <div class="w-full max-w-4xl bg-slate-900 varsity-border varsity-shadow p-6 rounded-3xl text-center">
+            <h2 id="resultTitle" class="text-4xl mb-4 italic text-yellow-500 uppercase">Bilan Final</h2>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6 text-white">
+                <div class="p-4 bg-red-900/30 varsity-border rounded-2xl flex flex-col">
+                    <h3 id="resNameA" class="text-xl text-red-400 mb-2 truncate uppercase">TEAM A</h3>
+                    <div id="resScoreA" class="text-5xl mb-4">0</div>
+                    <div class="flex flex-col gap-2 text-left bg-black/20 p-3 rounded-lg mb-4">
+                        <div class="flex justify-between text-[10px] border-b border-white/10 pb-1">
+                            <span>% POSSESSION</span> <span id="resPosPercentA" class="font-mono text-yellow-400">0%</span>
+                        </div>
+                        <div class="flex justify-between text-[10px] border-b border-white/10 pb-1">
+                            <span>NB POSSESSIONS</span> <span id="resPossA">0</span>
+                        </div>
+                        <div class="flex justify-between text-[10px]">
+                            <span>SCORE MOYEN</span> <span id="resAvgA" class="text-yellow-400 font-bold text-sm">0</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="stat-badge"><span>BUTS</span><span id="res1000A" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z3</span><span id="res100A" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z2</span><span id="res10A" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z1</span><span id="res1A" class="font-bold ml-2">0</span></div>
+                    </div>
+                </div>
+                <div class="p-4 bg-blue-900/30 varsity-border rounded-2xl flex flex-col">
+                    <h3 id="resNameB" class="text-xl text-blue-400 mb-2 truncate uppercase">TEAM B</h3>
+                    <div id="resScoreB" class="text-5xl mb-4">0</div>
+                    <div class="flex flex-col gap-2 text-left bg-black/20 p-3 rounded-lg mb-4">
+                        <div class="flex justify-between text-[10px] border-b border-white/10 pb-1">
+                            <span>% POSSESSION</span> <span id="resPosPercentB" class="font-mono text-yellow-400">0%</span>
+                        </div>
+                        <div class="flex justify-between text-[10px] border-b border-white/10 pb-1">
+                            <span>NB POSSESSIONS</span> <span id="resPossB">0</span>
+                        </div>
+                        <div class="flex justify-between text-[10px]">
+                            <span>SCORE MOYEN</span> <span id="resAvgB" class="text-yellow-400 font-bold text-sm">0</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="stat-badge"><span>BUTS</span><span id="res1000B" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z3</span><span id="res100B" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z2</span><span id="res10B" class="font-bold ml-2">0</span></div>
+                        <div class="stat-badge"><span>Z1</span><span id="res1B" class="font-bold ml-2">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3" id="resultActions">
+                <button onclick="showView('config')" class="w-full bg-emerald-500 text-black py-4 varsity-shadow uppercase italic font-bold text-xl hover:bg-emerald-400 transition-colors">
+                    Nouveau Match
+                </button>
+                <button onclick="showView('home')" class="w-full bg-slate-800 text-white py-3 varsity-shadow uppercase italic font-bold text-sm opacity-80 hover:opacity-100 transition-opacity">
+                    Retour à l'accueil
+                </button>
+            </div>
+            
+            <div class="hidden" id="historyDetailActions">
+                <button onclick="showView('history')" class="w-full bg-yellow-500 text-black py-4 varsity-shadow uppercase italic font-bold text-xl hover:bg-yellow-400 transition-colors">
+                    Retour à l'historique
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. HISTORIQUE -->
+    <div id="view-history" class="view bg-slate-900">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl italic uppercase text-yellow-500">Historique</h2>
+            <button onclick="showView('home')" class="bg-slate-700 px-4 py-2 rounded text-xs uppercase">Fermer</button>
+        </div>
+        <p class="text-[10px] text-slate-500 mb-4 uppercase italic">Cliquez sur un match pour voir les statistiques détaillées.</p>
+        <div id="historyList" class="flex-grow overflow-y-auto pr-2"></div>
+        <div class="pt-4 mt-auto">
+            <button onclick="clearHistory()" class="w-full bg-red-900/40 border border-red-500 text-red-400 py-3 rounded uppercase text-xs hover:bg-red-900/60">
+                Effacer tout l'historique
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            running: false,
+            possessionDecided: false, // Flag pour savoir si on a déjà choisi l'engagement
+            activeTeam: null,
+            scoreA: 0, scoreB: 0,
+            timeA: 0, timeB: 0,
+            matchTime: 420,
+            points: [1, 10, 100, 1000],
+            counts: {
+                A: { 1: 0, 10: 0, 100: 0, 1000: 0, possessions: 0 },
+                B: { 1: 0, 10: 0, 100: 0, 1000: 0, possessions: 0 }
+            },
+            history: []
+        };
+
+        let interval = null;
+
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            const target = document.getElementById('view-' + viewId);
+            if (target) target.classList.add('active');
+            
+            if (viewId !== 'result') {
+                document.getElementById('resultActions').classList.remove('hidden');
+                document.getElementById('historyDetailActions').classList.add('hidden');
+                document.getElementById('resultTitle').innerText = "Bilan Final";
+            }
+        }
+
+        function startMatch() {
+            const nameA = document.getElementById('inputNameA').value || 'EQUIPE A';
+            const nameB = document.getElementById('inputNameB').value || 'EQUIPE B';
+            document.getElementById('displayNameA').innerText = nameA;
+            document.getElementById('displayNameB').innerText = nameB;
+            
+            // Mettre à jour les boutons de la modale de choix
+            document.getElementById('choiceBtnA').innerText = nameA;
+            document.getElementById('choiceBtnB').innerText = nameB;
+            
+            resetMatchData();
+            showView('match');
+            updateDisplay();
+        }
+
+        function handleDurationChange() {
+            const val = parseInt(document.getElementById('matchDurationInput').value);
+            if (!isNaN(val) && val > 0 && !gameState.running && gameState.timeA === 0 && gameState.timeB === 0) {
+                gameState.matchTime = val * 60;
+                updateDisplay();
+            }
+        }
+
+        function toggleGame() {
+            if (gameState.matchTime <= 0) return;
+
+            // Si c'est le tout premier lancement, demander la possession
+            if (!gameState.possessionDecided) {
+                document.getElementById('possessionModal').style.display = 'flex';
+                return;
+            }
+
+            gameState.running = !gameState.running;
+            updatePlayButton();
+            if (gameState.running) {
+                if(!interval) interval = setInterval(tick, 1000);
+                playSound(600, 0.1);
+            } else {
+                stopInterval();
+                playSound(300, 0.2);
+            }
+        }
+
+        function setInitialPossession(team) {
+            gameState.possessionDecided = true;
+            gameState.activeTeam = team;
+            gameState.counts[team].possessions = 1;
+            
+            document.getElementById('possessionModal').style.display = 'none';
+            
+            // Mise à jour visuelle immédiate avant de lancer
+            selectTeam(team); 
+            
+            // Lancer le jeu automatiquement après le choix
+            gameState.running = true;
+            updatePlayButton();
+            if(!interval) interval = setInterval(tick, 1000);
+            playSound(600, 0.1);
+        }
+
+        function requestEndMatch() {
+            if (!gameState.possessionDecided && gameState.timeA === 0 && gameState.timeB === 0) {
+                showView('home');
+                return;
+            }
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function closeConfirmModal(confirm) {
+            document.getElementById('confirmModal').style.display = 'none';
+            if (confirm) endMatch();
+        }
+
+        function stopInterval() {
+            if(interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        }
+
+        function updatePlayButton() {
+            const btn = document.getElementById('playBtn');
+            if (gameState.running) {
+                btn.innerText = "Pause";
+                btn.style.backgroundColor = "#ef4444";
+            } else {
+                btn.innerText = "Start";
+                btn.style.backgroundColor = "#eab308";
+            }
+        }
+
+        function tick() {
+            if (gameState.matchTime > 0) {
+                gameState.matchTime--;
+                if (gameState.activeTeam === 'A') gameState.timeA++;
+                else if (gameState.activeTeam === 'B') gameState.timeB++;
+                updateDisplay();
+                if (gameState.matchTime === 0) endMatch();
+            }
+        }
+
+        function selectTeam(team) {
+            if (!gameState.possessionDecided) return;
+            
+            if (gameState.activeTeam !== team) {
+                gameState.activeTeam = team;
+                gameState.counts[team].possessions++;
+            }
+            document.getElementById('cardA').classList.toggle('inactive', team !== 'A');
+            document.getElementById('cardB').classList.toggle('inactive', team !== 'B');
+            document.getElementById('pitchA').classList.toggle('active-pitch', team === 'A');
+            document.getElementById('pitchB').classList.toggle('active-pitch', team === 'B');
+            playSound(team === 'A' ? 440 : 550, 0.05);
+        }
+
+        function scoreZone(team, zoneIdx, event) {
+            event.stopPropagation();
+            if (!gameState.running || gameState.activeTeam !== team) return;
+
+            const disc = document.getElementById(`disc${team}`);
+            const pts = gameState.points[zoneIdx];
+
+            gameState.history.push({
+                team: team,
+                activeTeam: gameState.activeTeam,
+                scoreA: gameState.scoreA,
+                scoreB: gameState.scoreB,
+                discPos: disc.style.left,
+                timeA: gameState.timeA,
+                timeB: gameState.timeB,
+                matchTime: gameState.matchTime,
+                counts: JSON.parse(JSON.stringify(gameState.counts))
+            });
+
+            if (team === 'A') gameState.scoreA += pts;
+            else gameState.scoreB += pts;
+            
+            gameState.counts[team][pts]++;
+
+            let pos = (team === 'A') ? (85 - (zoneIdx * 23.3)) : (15 + (zoneIdx * 23.3));
+            disc.style.left = pos + "%";
+
+            if (zoneIdx === 3) {
+                const pitch = document.getElementById(`pitch${team}`);
+                pitch.classList.add('flash');
+                playSound(880, 0.3);
+                setTimeout(() => {
+                    pitch.classList.remove('flash');
+                    disc.style.left = (team === 'A' ? "85%" : "15%");
+                }, 600);
+            } else {
+                playSound(1000 + (zoneIdx * 200), 0.05);
+            }
+
+            // Changement automatique de possession après un score ou une perte
+            selectTeam(team === 'A' ? 'B' : 'A');
+            updateDisplay();
+        }
+
+        function undoAction() {
+            if (gameState.history.length === 0) return;
+            const last = gameState.history.pop();
+            gameState.scoreA = last.scoreA;
+            gameState.scoreB = last.scoreB;
+            gameState.timeA = last.timeA;
+            gameState.timeB = last.timeB;
+            gameState.matchTime = last.matchTime;
+            gameState.activeTeam = last.activeTeam;
+            gameState.counts = last.counts;
+            
+            document.getElementById('cardA').classList.toggle('inactive', gameState.activeTeam !== 'A');
+            document.getElementById('cardB').classList.toggle('inactive', gameState.activeTeam !== 'B');
+            document.getElementById(`disc${last.team}`).style.left = last.discPos;
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('gameTimer').innerText = formatTime(gameState.matchTime);
+            document.getElementById('scoreA').innerText = gameState.scoreA.toLocaleString();
+            document.getElementById('scoreB').innerText = gameState.scoreB.toLocaleString();
+            document.getElementById('posA').innerText = formatTime(gameState.timeA);
+            document.getElementById('posB').innerText = formatTime(gameState.timeB);
+        }
+
+        function formatTime(s) {
+            return Math.floor(s/60).toString().padStart(2,'0') + ":" + (s%60).toString().padStart(2,'0');
+        }
+
+        function resetMatchData() {
+            stopInterval();
+            const durationInput = document.getElementById('matchDurationInput');
+            const duration = durationInput ? (parseInt(durationInput.value) || 7) : 7;
+            gameState = { 
+                running: false, 
+                possessionDecided: false,
+                activeTeam: null, 
+                scoreA: 0, scoreB: 0, 
+                timeA: 0, timeB: 0, matchTime: duration * 60, 
+                points: [1, 10, 100, 1000], 
+                counts: {
+                    A: { 1: 0, 10: 0, 100: 0, 1000: 0, possessions: 0 },
+                    B: { 1: 0, 10: 0, 100: 0, 1000: 0, possessions: 0 }
+                },
+                history: [] 
+            };
+            updatePlayButton();
+            if (document.getElementById('discA')) document.getElementById('discA').style.left = "85%";
+            if (document.getElementById('discB')) document.getElementById('discB').style.left = "15%";
+            
+            // Reset styles visuels (les deux sont inactifs au début)
+            document.getElementById('cardA').classList.add('inactive');
+            document.getElementById('cardB').classList.add('inactive');
+            document.getElementById('pitchA').classList.remove('active-pitch');
+            document.getElementById('pitchB').classList.remove('active-pitch');
+            
+            updateDisplay();
+        }
+
+        function saveToHistory() {
+            if (gameState.scoreA === 0 && gameState.scoreB === 0) return;
+            const matchData = {
+                date: new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
+                teamA: document.getElementById('displayNameA').innerText,
+                teamB: document.getElementById('displayNameB').innerText,
+                scoreA: gameState.scoreA,
+                scoreB: gameState.scoreB,
+                timeA: gameState.timeA,
+                timeB: gameState.timeB,
+                counts: JSON.parse(JSON.stringify(gameState.counts))
+            };
+            let history = JSON.parse(localStorage.getItem('ultimateHistory') || '[]');
+            history.unshift(matchData);
+            if (history.length > 20) history.pop();
+            localStorage.setItem('ultimateHistory', JSON.stringify(history));
+        }
+
+        function openHistory() {
+            const list = document.getElementById('historyList');
+            const history = JSON.parse(localStorage.getItem('ultimateHistory') || '[]');
+            if (history.length === 0) {
+                list.innerHTML = `<div class="text-center text-slate-500 mt-20 uppercase text-sm">Aucun match enregistré</div>`;
+            } else {
+                list.innerHTML = history.map((m, index) => `
+                    <div class="history-item varsity-shadow" onclick="showMatchDetails(${index})">
+                        <div class="text-[8px] text-slate-400 mb-1 uppercase">${m.date}</div>
+                        <div class="flex justify-between items-center">
+                            <div class="text-sm truncate max-w-[40%] text-red-400 uppercase">${m.teamA}</div>
+                            <div class="text-lg font-bold">${m.scoreA} - ${m.scoreB}</div>
+                            <div class="text-sm truncate max-w-[40%] text-blue-400 text-right uppercase">${m.teamB}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            showView('history');
+        }
+
+        function showMatchDetails(index) {
+            const history = JSON.parse(localStorage.getItem('ultimateHistory') || '[]');
+            const m = history[index];
+            if (!m) return;
+            document.getElementById('resultActions').classList.add('hidden');
+            document.getElementById('historyDetailActions').classList.remove('hidden');
+            document.getElementById('resultTitle').innerText = "Stats Match : " + m.date;
+            fillResultPage(m);
+            showView('result');
+        }
+
+        function fillResultPage(data) {
+            const avgA = data.counts.A.possessions > 0 ? (data.scoreA / data.counts.A.possessions).toFixed(1) : 0;
+            const avgB = data.counts.B.possessions > 0 ? (data.scoreB / data.counts.B.possessions).toFixed(1) : 0;
+            const totalTime = data.timeA + data.timeB;
+            const percentA = totalTime > 0 ? ((data.timeA / totalTime) * 100).toFixed(1) : 0;
+            const percentB = totalTime > 0 ? ((data.timeB / totalTime) * 100).toFixed(1) : 0;
+
+            document.getElementById('resNameA').innerText = data.teamA;
+            document.getElementById('resScoreA').innerText = data.scoreA.toLocaleString();
+            document.getElementById('resPosPercentA').innerText = percentA + "%";
+            document.getElementById('resPossA').innerText = data.counts.A.possessions;
+            document.getElementById('resAvgA').innerText = avgA;
+            document.getElementById('res1000A').innerText = data.counts.A[1000];
+            document.getElementById('res100A').innerText = data.counts.A[100];
+            document.getElementById('res10A').innerText = data.counts.A[10];
+            document.getElementById('res1A').innerText = data.counts.A[1];
+
+            document.getElementById('resNameB').innerText = data.teamB;
+            document.getElementById('resScoreB').innerText = data.scoreB.toLocaleString();
+            document.getElementById('resPosPercentB').innerText = percentB + "%";
+            document.getElementById('resPossB').innerText = data.counts.B.possessions;
+            document.getElementById('resAvgB').innerText = avgB;
+            document.getElementById('res1000B').innerText = data.counts.B[1000];
+            document.getElementById('res100B').innerText = data.counts.B[100];
+            document.getElementById('res10B').innerText = data.counts.B[10];
+            document.getElementById('res1B').innerText = data.counts.B[1];
+        }
+
+        function clearHistory() {
+            if(confirm("Effacer définitivement l'historique ?")) {
+                localStorage.removeItem('ultimateHistory');
+                openHistory();
+            }
+        }
+
+        function endMatch() {
+            gameState.running = false;
+            stopInterval();
+            updatePlayButton();
+            playSound(150, 0.8);
+            saveToHistory();
+
+            const currentMatch = {
+                teamA: document.getElementById('displayNameA').innerText,
+                teamB: document.getElementById('displayNameB').innerText,
+                scoreA: gameState.scoreA,
+                scoreB: gameState.scoreB,
+                timeA: gameState.timeA,
+                timeB: gameState.timeB,
+                counts: gameState.counts
+            };
+            
+            fillResultPage(currentMatch);
+            showView('result');
+        }
+
+        function playSound(freq, dur) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                osc.connect(g); g.connect(ctx.destination);
+                osc.start();
+                g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + dur);
+                osc.stop(ctx.currentTime + dur);
+            } catch(e) {}
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
